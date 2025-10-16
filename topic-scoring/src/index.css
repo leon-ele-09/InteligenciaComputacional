@@ -5,9 +5,77 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  background-color: #f1c5f3; /* Example: light gray */
+  
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+h1,h2{
+  text-align: center;
+}
+
+.inputPost{
+  margin-left: 20px;
+  display: flex;
+  justify-content: center; /* Centers horizontally */
+  
+}
+
+
+.postContainer{
+  background-color: rgb(185, 133, 228);
+  margin-bottom: 20px; 
+  margin-left: 20px;
+  margin-right: 20px;
+  border-radius: 10px; 
+  
+  width: 40vw; 
+  padding-bottom: 10px;
+  margin: auto; 
+  box-shadow: 15px 10px 5px rgba(0, 0, 0, 0.3);
+
+  color :rgb(75, 13, 54);
+
+  transition-property: background-color, color;
+  transition-duration: 0.3s, 0.3s;
+  transition-timing-function: ease-in-out, ease-in-out;
+}
+
+.postText{
+
+  margin-left: 20px;
+  
+
+}
+
+.postContainer:hover{
+  
+  animation : hovering 1s ease-in-out infinite;
+  background-color: rgb(139, 86, 135);
+  color : white
+  
+}
+
+#title{
+  width : 300px;
+  padding : 10px;
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+@keyframes darkening{
+  from { background-color: rgb(185, 133, 228);}
+  to { }
+
+
+}
+@keyframes hovering {
+  from { transform: translateY(0px) ;  }
+  50% { transform: translateY(-10px) ; }
+  to { transform: translateY(0px) ; }
 }

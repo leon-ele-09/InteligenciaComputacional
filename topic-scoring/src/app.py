@@ -1,19 +1,20 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 import time
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+utils_path = os.path.join(current_dir, 'modules')
+sys.path.append(utils_path)
 
-class backend:
-    @staticmethod
-    def GenerateNumbers():
-        # CONVERTIR A LISTA PARA MANEJAR EN JSON
-        return np.random.randint(0,100,5).tolist()
+import backend
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for local testing
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -23,9 +24,11 @@ class InputData(BaseModel):
     text: str
 
 @app.post("/ai")
-def home(data: InputData):
+def analizar_sentimiento(data: InputData):
+    resultado = backend.Backend.predict_sentiment(data.text) 
+    print(resultado)
     return {
         "input": data.text,
-        "scores": backend.GenerateNumbers(),  # ✅ CHANGED HERE
+        "scores": resultado,
         "timestamp": time.time()
     }

@@ -1,2 +1,14 @@
 npm start
 python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
+
+
+Order guarda el carrito
+Payment referencia a Order
+
+al dar en efectivo o al confirmar con tarjeta
+ejecutamos un get que va a crear la nueva orden y envia a un congrats con numero de orden
+
+tickets nos muestra todas las ordenes con fecha de creacion
+
+reportes.cshtml
+- ingresos, métodos de pago, productos y categorías más vendidas

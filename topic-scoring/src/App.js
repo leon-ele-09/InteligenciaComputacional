@@ -53,56 +53,63 @@ export default function ScoresApp() {
   return (
     <div >
       <div >
-        <h1 >Scores Dashboard</h1>
-        
-        <div >
+        <div class = "Headers">
+          
+          <div><h1 >Categorizacion de Topicos por BiLSTM</h1> <br /></div>
+          <div><h2 >V0.1 : Categorizacion de Posts <strong> Positivos y Negativos</strong></h2> <br /></div>
+          <div class = "postContainer" id = "title">
+            Por : <br/>
+            Eli Dominguez <br/>
+            Alejandra Dominguez <br/>
+            Alan Leon <br/>
+          </div>
+        </div>
+        <div class = "inputPost">
           <div >
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSubmit(e)}
-              placeholder="Enter your input..."
+              placeholder="Escribe el nuevo post..."
               
             />
             <button
               onClick={handleSubmit}
               
             >
-              Submit
+              Procesar
             </button>
           </div>
         </div>
 
         {results.length > 0 && (
-          <div >
-            <label >Sort by:</label>
+          <div class = "inputPost">
+            <label >Ordenar por:</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              
             >
               <option value="order">First-Come-First-Served</option>
-              <option value="0">Score [0]</option>
-              <option value="1">Score [1]</option>
-              <option value="2">Score [2]</option>
-              <option value="3">Score [3]</option>
-              <option value="4">Score [4]</option>
+              <option value="0">Por Negatividad</option>
+              <option value="1">Por positividad</option>
+              
             </select>
           </div>
+          
         )}
 
         <div >
           {sortedResults.length === 0 ? (
-            <div >
-              No results yet. Submit an input to get started!
+            <div class = "postContainer" style={{marginTop : '20px'}}>
+              <div class = "postText"> Agrega una publicación para que el modelo la valore </div>
             </div>
           ) : (
             sortedResults.map((result, idx) => {
 
               
               return (
-                <div 
+                <div class = "postContainer"
                   key={result.timestamp} 
                   
                   style={{
@@ -110,7 +117,7 @@ export default function ScoresApp() {
                     opacity: 1
                   }}
                 >
-                  <div >
+                  <div class = "postText">
                     <div>
                       <h3 >Input: {result.input}</h3>
                       <p >
@@ -120,11 +127,10 @@ export default function ScoresApp() {
 
                   </div>
                   
-                  <div >
+                  <div class = "postText" >
                     {result.scores.map((score, i) => (
                       <div
                         key={i}
-                        
                       >
                         {score}
                       </div>
