@@ -25,10 +25,13 @@ class InputData(BaseModel):
 
 @app.post("/ai")
 def analizar_sentimiento(data: InputData):
-    resultado = backend.Backend.predict_sentiment(data.text) 
-    print(resultado)
+    resultado = backend.Backend.predict_sentiment(data.text)
+    print(f"Sentiment scores: {resultado['sentiment_scores']}")
+    print(f"Topic scores: {resultado['topic_scores']}")
+    
     return {
         "input": data.text,
-        "scores": resultado,
+        "sentiment_scores": resultado['sentiment_scores'],
+        "topic_scores": resultado['topic_scores'],
         "timestamp": time.time()
     }

@@ -1,4 +1,9 @@
 import { useState } from 'react';
+// Importamos componentes de gráficos
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts';
 
 export default function ScoresApp() {
   const [input, setInput] = useState('');
@@ -6,6 +11,7 @@ export default function ScoresApp() {
   const [sortBy, setSortBy] = useState('order');
   const [showTopicWeights, setShowTopicWeights] = useState(false);
   const [showSentimentWeights, setShowSentimentWeights] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Nuevo estado para carga
   
   // Topic labels (19)
   const topicLabels = [
@@ -35,6 +41,9 @@ export default function ScoresApp() {
     'Tristeza', 'Alegria', 'Amor',
     'Ira', 'Miedo', 'Sorpresa'
   ];
+
+  // Colores para las gráficas
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
   
   // Initialize weights to 1.0 for all labels
   const [topicWeights, setTopicWeights] = useState(
@@ -71,28 +80,87 @@ export default function ScoresApp() {
     return topicScore + sentimentScore;
   };
 
-  // Llamada a la API
+  // Función para procesar un solo texto (reutilizable)
+  const fetchPrediction = async (text) => {
+    const response = await fetch("http://127.0.0.1:8000/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text }),
+    });
+    if (!response.ok) throw new Error("Request failed");
+    return await response.json();
+  };
+
+  // Llamada a la API (Individual)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // esta vacio?
     if (!input.trim()) return;
-    // try catch para evitar crasheos
+    
+    setIsLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input }),
-      });
-
-      if (!response.ok) throw new Error("Request failed");
-      const data = await response.json();
-
+      const data = await fetchPrediction(input);
       setResults((prev) => [...prev, data]);
     } catch (err) {
       console.error("Error:", err);
       alert("Backend not reachable or error in response");
     } finally {
       setInput('');
+      setIsLoading(false);
+    }
+  };
+
+  // Manejo de Carga de Archivo (Dataset)
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsLoading(true);
+
+    try {
+      const text = await file.text();
+      // Dividir por líneas y remover encabezado
+      const lines = text.split('\n');
+      
+      // Filtrar líneas vacías y extraer mensajes
+      // Formato: datetime_iso, date, time, user, message
+      // El mensaje es la 5ta columna (índice 4), pero podría contener comas, así que tomamos todo después de la 4ta coma.
+      const messages = lines.slice(1) // Ignorar header
+        .map(line => {
+          const parts = line.split(',');
+          if (parts.length < 5) return null;
+          // Unir todo a partir del índice 4 en caso de que el mensaje tenga comas
+          return parts.slice(4).join(',').trim().replace(/^"|"$/g, ''); // Quitar comillas si es CSV estándar
+        })
+        .filter(msg => msg && msg.length > 0);
+
+      // Aleatorizar (Fisher-Yates shuffle)
+      for (let i = messages.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [messages[i], messages[j]] = [messages[j], messages[i]];
+      }
+
+      // Tomar muestra de 200
+      const sample = messages.slice(0, 200);
+
+      console.log(`Procesando ${sample.length} mensajes...`);
+
+      // Procesar en paralelo
+      const promises = sample.map(msg => fetchPrediction(msg).catch(e => null)); // Catch individual para no romper todo
+      const batchResults = await Promise.all(promises);
+      
+      // Filtrar nulos (errores) y añadir al estado
+      const validResults = batchResults.filter(r => r !== null);
+      setResults(prev => [...prev, ...validResults]);
+      
+      alert(`Procesados ${validResults.length} mensajes exitosamente.`);
+
+    } catch (err) {
+      console.error("Error procesando archivo:", err);
+      alert("Error al leer el archivo o conectar con el servidor.");
+    } finally {
+      setIsLoading(false);
+      // Resetear el input file para permitir subir el mismo archivo de nuevo si se desea
+      e.target.value = null; 
     }
   };
 
@@ -125,12 +193,45 @@ export default function ScoresApp() {
 
   const sortedResults = getSortedResults();
 
+  // Calcular datos para gráficas
+  const getChartData = () => {
+    if (results.length === 0) return { topics: [], sentiments: [] };
+
+    // Contar cuántas veces cada tópico fue el #1
+    const topicCounts = Array(topicLabels.length).fill(0);
+    const sentimentCounts = Array(sentimentLabels.length).fill(0);
+
+    results.forEach(res => {
+      // Top Topic
+      const topTopicIdx = res.topic_scores.indexOf(Math.max(...res.topic_scores));
+      topicCounts[topTopicIdx]++;
+
+      // Top Sentiment
+      const topSentIdx = res.sentiment_scores.indexOf(Math.max(...res.sentiment_scores));
+      sentimentCounts[topSentIdx]++;
+    });
+
+    const topicData = topicLabels.map((label, i) => ({
+      name: label,
+      count: topicCounts[i]
+    })).filter(d => d.count > 0).sort((a, b) => b.count - a.count); // Solo mostrar los que tienen datos
+
+    const sentimentData = sentimentLabels.map((label, i) => ({
+      name: label,
+      count: sentimentCounts[i]
+    }));
+
+    return { topicData, sentimentData };
+  };
+
+  const { topicData, sentimentData } = getChartData();
+
   return (
     <div>
       <div>
         <div className="Headers">
           <div><h1>Categorizacion de Topicos por BiLSTM</h1><br /></div>
-          <div><h2>V1.0 : Categorizacion de Posts <strong> personalizada </strong></h2><br /></div>
+          <div><h2>V1.0 : Categorizacion de Posts <strong> Positivos y Negativos</strong></h2><br /></div>
           <div className="postContainer" id="title">
             Por : <br/>
             Eli Dominguez <br/>
@@ -138,24 +239,97 @@ export default function ScoresApp() {
             Alan Leon <br/>
           </div>
         </div>
-        <div className="inputPost">
-          <div>
+
+        {/* Input Area */}
+        <div className="inputPost" style={{flexDirection: 'column', gap: '15px'}}>
+          {/* Manual Input */}
+          <div style={{display: 'flex', width: '100%', gap: '10px'}}>
             <input
               type="text"
               value={input}
+              disabled={isLoading}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSubmit(e)}
               placeholder="Escribe el nuevo post..."
             />
-            <button onClick={handleSubmit}>
-              Procesar
+            <button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? '...' : 'Procesar'}
             </button>
+          </div>
+
+          {/* CSV Upload */}
+          <div style={{
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '10px', 
+            background: '#f8f9fa', 
+            padding: '10px', 
+            borderRadius: '8px',
+            border: '1px dashed #ccc'
+          }}>
+            <span style={{fontWeight: 'bold', fontSize: '14px'}}>Cargar Dataset (CSV):</span>
+            <input 
+              type="file" 
+              accept=".csv"
+              onChange={handleFileUpload}
+              disabled={isLoading}
+              style={{fontSize: '14px'}}
+            />
+            {isLoading && <span style={{color: '#0066cc', fontWeight: 'bold'}}>Procesando muestra aleatoria... Por favor espere.</span>}
           </div>
         </div>
 
+        {/* Graphs Section */}
+        {results.length > 0 && (
+          <div className="postContainer" style={{flexDirection: 'column', marginTop: '20px'}}>
+            <h3 style={{marginBottom: '20px'}}>Estadísticas de Resultados ({results.length} posts)</h3>
+            
+            <div style={{display: 'flex', flexWrap: 'wrap', width: '100%', gap: '20px'}}>
+              {/* Gráfica de Tópicos */}
+              <div style={{flex: '1 1 500px', height: '300px'}}>
+                <h4 style={{textAlign: 'center'}}>Distribución de Tópicos Dominantes</h4>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topicData} margin={{top: 5, right: 30, left: 20, bottom: 50}}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} height={80} style={{fontSize: '10px'}}/>
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#8884d8" name="Cantidad de Posts" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Gráfica de Sentimientos */}
+              <div style={{flex: '1 1 300px', height: '300px'}}>
+                <h4 style={{textAlign: 'center'}}>Distribución de Sentimientos</h4>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={sentimentData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                    >
+                      {sentimentData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Existing Filters and Lists */}
         {results.length > 0 && (
           <div>
-            <div className="inputPost">
+            <div className="inputPost" style={{marginTop: '20px'}}>
               <label>Ordenar por:</label>
               <select
                 value={sortBy}
@@ -176,6 +350,7 @@ export default function ScoresApp() {
               </select>
             </div>
 
+            {/* Weights Controls (unchanged logic) */}
             <div className="inputPost" style={{marginTop: '10px'}}>
               <button 
                 onClick={() => setShowTopicWeights(!showTopicWeights)}
@@ -273,7 +448,7 @@ export default function ScoresApp() {
         <div>
           {sortedResults.length === 0 ? (
             <div className="postContainer" style={{marginTop : '20px'}}>
-              <div className="postText"> Agrega una publicación para que el modelo la valore </div>
+              <div className="postText"> Agrega una publicación o sube un CSV para que el modelo lo valore </div>
             </div>
           ) : (
             sortedResults.map((result, idx) => {
@@ -285,7 +460,7 @@ export default function ScoresApp() {
               
               return (
                 <div className="postContainer"
-                  key={result.timestamp} 
+                  key={idx} // Cambiado a idx porque timestamp puede repetirse en cargas batch rápidas
                   style={{
                     transform: 'translateY(0)',
                     opacity: 1
@@ -294,8 +469,9 @@ export default function ScoresApp() {
                   <div className="postText">
                     <div>
                       <h3>Input: {result.input}</h3>
-                      <p>
-                        Submitted: {new Date(result.timestamp).toLocaleTimeString()}
+                      {/* Solo mostramos fecha si existe, el batch crea fechas nuevas en el backend generalmente */}
+                      <p style={{fontSize: '0.8em', color: '#666'}}>
+                        Processed: {result.timestamp ? new Date(result.timestamp).toLocaleTimeString() : 'Just now'}
                       </p>
                       <p style={{marginTop: '10px', fontWeight: 'bold'}}>
                         Top Topic: {topicLabels[topTopicIndex]} ({(topScore * 100).toFixed(1)}%)
